@@ -19,13 +19,42 @@ def normalize(array: np.ndarray, range_: tuple):
 class GeoTiff():
     def __init__(
             self,
-            path: str,
+            input: Union[str, np.ndarray],
+            name: str = None,
+            meta: dict = None
         ) -> None:
         
-        f = rasterio.open(path)
-        self.__reader = f
-        self.__meta = f.meta.copy()
-        self.__bands: np.ndarray = f.read()
+        # if not isinstance(path, str):
+        #     try:
+        #         path = str(path)
+        #     except :
+        #         raise ValueError('The path parameter you input for GeoTiff should be string or can be converted into string by str() function.')
+        if not isinstance(input, np.ndarray):
+            f = rasterio.open(input)
+            self.__reader = f
+            self.__meta = f.meta.copy()
+            self.__name = Path(f.name).stem
+
+            self.__bands: np.ndarray = f.read()
+            self.__band_num = f.count
+            self.__shape = f.shape
+
+        else:
+            self.__reader = None
+            self.__name = name
+            if input.ndim != 3:
+                raise ValueError('The dimention of ndarray should be 3!')
+            
+            self.__bands = input
+            self.__band_num = input.shape[0]
+            self.__shape = (input.shape[1], input.shape[2])
+
+            meta = meta.copy()
+            meta.update(count= self.__band_num)
+            meta.update(height= self.__shape[0])
+            meta.update(width= self.__shape[1])
+            self.__meta = meta
+
 
     @property
     def reader(self):
@@ -36,11 +65,24 @@ class GeoTiff():
         return self.__meta
     
     @property
+    def name(self):
+        return self.__name
+
+    @property
+    def bands(self):
+        return self.__bands
+
+    @property
     def band_num(self):
-        return self.meta['count']
+        return self.__band_num
+    
+    @property
+    def shape(self):
+        return self.__shape
+
 
     def write(self, path: str):
-        with rasterio.open(path, 'w', **self.__meta) as f:
+        with rasterio.open(path, 'w', **self.meta) as f:
             f.write(self.__bands)
 
     def get_image_for_show(self, render_pattern= None):
@@ -121,28 +163,3 @@ def geotiff_cropping(input_tiff: GeoTiff, features, output_folder: Union[str, Pa
             output_path = output_folder / f'{id}.tif'
             with rasterio.open(output_path, 'w', **output_meta) as f:
                 f.write(img)
-
-
-# * Paths to the input GeoTIFF and shapefile.
-input_tiff_path = 'D:\Work\Vector\output.tif'
-shapefile_path = 'D:\\Work\Vector\ChongMing\\for_cropping_test\\for_cropping_test.shp'
-features = fiona.open(shapefile_path, 'r')
-
-
-tiff = GeoTiff(input_tiff_path)
-# render_pattern = ((-4.1, -23.28), (-12.01, -30.98), (0.85, -0.11))
-# image = tiff.get_image_for_show(render_pattern= render_pattern)
-
-
-# plt.imshow(image)
-# plt.axis('off')
-# plt.show()
-
-
-geotiff_cropping(tiff, features, 'D:\\Work\\Vector\\tiff', output_type= OutputType.GeoTiff)
-
-# img = np.load('')
-# image = get_image_for_show(img, render_pattern)
-# plt.imshow(image)
-# plt.axis('off')
-# plt.show()
