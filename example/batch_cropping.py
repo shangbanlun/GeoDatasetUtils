@@ -9,7 +9,7 @@ sys.path.append('./')
 from GeoDatasetUtils.core import GeoTiff, geotiff_cropping, OutputType
 
 
-def batch_process(days: List[Path], input_folder_name: str, output_folder_name: str, func: Callable, **kwargs):
+def batch_process(days: List[Path], input_folder_name: str, output_folder_name: str, func: Callable):
     for idx, day in enumerate(days):
         input_folder_path = day / input_folder_name
         files = [file for file in input_folder_path.iterdir() if file.is_file()]
@@ -43,7 +43,7 @@ def save_image(input: GeoTiff, output_path: str):
     plt.savefig(output_path, dpi = 1000)
 
 
-def batch_save_image(days: List[Path], input_folder_name: str, output_folder_name: str, func: Callable, **kwargs):
+def batch_save_image(days: List[Path], input_folder_name: str, output_folder_name: str, func: Callable):
     for idx, day in enumerate(days):
         input_folder_path = day / input_folder_name
         files = [file for file in input_folder_path.iterdir() if file.is_file()]
@@ -62,11 +62,11 @@ def batch_save_image(days: List[Path], input_folder_name: str, output_folder_nam
 
 
 def main():
-    home_folder = Path('../Image')
+    home_folder = Path('../Data/Image')
     days = [day for day in home_folder.iterdir() if not day.is_file()]
     days.sort()
     # days = [days[0]]
-    # batch_process(days, 'GeoTiff', 'GeoTiff_rgb', convert_2_rgb)
+    batch_process(days, 'GeoTiff', 'GeoTiff_rgb', convert_2_rgb)
     batch_save_image(days, 'GeoTiff_rgb', 'image', save_image)
     
 

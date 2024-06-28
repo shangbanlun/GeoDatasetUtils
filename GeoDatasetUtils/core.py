@@ -138,7 +138,7 @@ def geotiff_cropping(input_tiff: GeoTiff, features, output_folder: Union[str, Pa
     if not output_folder.exists():
         output_folder.mkdir()
 
-    # * iterate each polygon.
+    # * iterate each polygon. 
     for feature in features:
         id = feature['properties']['OBJECTID']
         ploygon = feature['geometry']
