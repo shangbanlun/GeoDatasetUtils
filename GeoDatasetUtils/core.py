@@ -140,7 +140,8 @@ class GeoTiff():
         # image = np.transpose(image, (1, 2, 0))    # * (channel, height, width) -> (heigth, width, channel)
         
         return image
-    
+
+
     def resampling(self, scale_factor: float):
         """return a GeoTiff with a scaled resolution.
 
@@ -200,7 +201,6 @@ class GeoTiff():
         # * iterate each polygon. 
         for feature in features:
             id = feature['properties'][field_name]
-            id = f'{id:05d}'
             ploygon = feature['geometry']
             shapes = [ploygon]
 
@@ -275,4 +275,3 @@ def geotiff_cropping(input_tiff: GeoTiff, shapefile_path: str, field_name: str, 
             with rasterio.open(output_path, 'w', **output_meta) as f:
                 f.write(img)
                 
-
