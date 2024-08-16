@@ -4,16 +4,20 @@ from pathlib import Path
 import numpy as np
 import rasterio
 import rasterio.mask
+from rasterio.enums import Resampling
 
 
 def _normalize(array: np.ndarray, range_: tuple):
     max_value = range_[0]
     min_value = range_[1]
-    array_copy = array.copy()
-    array[array_copy > max_value] = max_value
-    array[array_copy < min_value] = min_value
     
-    return (array - min_value) / (max_value - min_value)
+    array = (array - min_value) / (max_value - min_value)
+    array_copy = array.copy()
+    
+    array[array_copy > 1.] = 1.
+    array[array_copy < 0.] = 0.
+    
+    return array
 
 class GeoTiff():
     def __init__(
@@ -37,6 +41,8 @@ class GeoTiff():
             self.__bands: np.ndarray = f.read()
             self.__band_num = f.count
             self.__shape = f.shape
+            self.__height = f.height
+            self.__width = f.width
 
         else:
             self.__reader = None
@@ -47,6 +53,8 @@ class GeoTiff():
             self.__bands = input
             self.__band_num = input.shape[0]
             self.__shape = (input.shape[1], input.shape[2])
+            self.__height = input.shape[1]
+            self.__width = input.shape[2]
 
             meta = meta.copy()
             meta.update(count= self.__band_num)
@@ -78,18 +86,26 @@ class GeoTiff():
     @property
     def shape(self):
         return self.__shape
+    
+    @property
+    def height(self):
+        return self.__height
+    
+    @property
+    def width(self):
+        return self.__width
 
 
     def write(self, path: str):
         with rasterio.open(path, 'w', **self.meta) as f:
             f.write(self.__bands)
 
-    def get_image_for_show(self, render_pattern= None):
+    def to_numpy(self, norm_pattern= None):
         
         image = []
         for idx, band in enumerate(self.__bands):
-            if render_pattern != None:
-                band = _normalize(band, render_pattern[idx])
+            if norm_pattern is not None:
+                band = _normalize(band, norm_pattern[idx])
                 image.append(band)
             else:
                 max_value = np.max(band[0])
@@ -98,17 +114,38 @@ class GeoTiff():
                 image.append(band)
                 
         image = np.stack(image, axis= 0)
-        image = np.transpose(image, (1, 2, 0))    # * (channel, height, width) -> (heigth, width, channel)
+        # image = np.transpose(image, (1, 2, 0))    # * (channel, height, width) -> (heigth, width, channel)
         
         return image
+    
+    def resolution_increase(self, scale_factor: float):
+        data = self.reader.read(
+            out_shape=(
+                    self.band_num,
+                    int(self.height * scale_factor),
+                    int(self.width * scale_factor)
+                ),
+            resampling=Resampling.nearest
+        )
+    
+        # Update the metadata to reflect the new resolution
+        transform = self.reader.transform * self.reader.transform.scale(1./scale_factor, 1./scale_factor)
 
-render_pattern = ((-4.1, -23.28), (-12.01, -30.98), (0.85, -0.11))
+        # Define the metadata for the new GeoTIFF
+        meta = self.meta
+        meta.update({
+            'height': data.shape[1],
+            'width': data.shape[2],
+            'transform': transform
+        })
+
+        return GeoTiff(data, meta= meta)
 
 def get_image_for_show(bands: np.ndarray, render_pattern= None):
         
         image = []
         for idx, band in enumerate(bands):
-            if render_pattern != None:
+            if render_pattern is not None:
                 band = _normalize(band, render_pattern[idx])
                 image.append(band)
             else:
@@ -126,7 +163,7 @@ class OutputType(Enum):
     GeoTiff = 'geotiff'
     NumPy = 'numpy'
 
-def geotiff_cropping(input_tiff: GeoTiff, features, output_folder: Union[str, Path], no_data= -9999., output_type= OutputType.NumPy):
+def geotiff_cropping(input_tiff: GeoTiff, features, field_name: str, output_folder: Union[str, Path], no_data= -9999., output_type= OutputType.NumPy):
     
     if output_type == OutputType.GeoTiff:
         output_meta = input_tiff.meta.copy()
@@ -140,7 +177,7 @@ def geotiff_cropping(input_tiff: GeoTiff, features, output_folder: Union[str, Pa
 
     # * iterate each polygon. 
     for feature in features:
-        id = feature['properties']['OBJECTID']
+        id = feature['properties'][field_name]
         id = f'{id:05d}'
         ploygon = feature['geometry']
         shapes = [ploygon]
@@ -153,7 +190,7 @@ def geotiff_cropping(input_tiff: GeoTiff, features, output_folder: Union[str, Pa
             np.savez_compressed(output_path, img)
 
         elif output_type == OutputType.GeoTiff:
-            img, out_transform = rasterio.mask.mask(input_tiff.reader, shapes, crop=True)
+            img, out_transform = rasterio.mask.mask(input_tiff.reader, shapes, crop=True, nodata= no_data)
             output_meta.update({
                 "driver": "GTiff",
                 "height": img.shape[1],
