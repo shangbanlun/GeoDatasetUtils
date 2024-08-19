@@ -63,11 +63,12 @@ class GeoTiff():
             self.__height = input.shape[1]
             self.__width = input.shape[2]
 
-            meta = meta.copy()
-            meta.update(count= self.__band_num)
-            meta.update(height= self.__shape[0])
-            meta.update(width= self.__shape[1])
-            self.__meta = meta
+            if meta is not None:
+                meta = meta.copy()
+                meta.update(count= self.__band_num)
+                meta.update(height= self.__shape[0])
+                meta.update(width= self.__shape[1])
+                self.__meta = meta
 
 
     @property
@@ -274,4 +275,5 @@ def geotiff_cropping(input_tiff: GeoTiff, shapefile_path: str, field_name: str, 
             output_path = output_folder / f'{id}.tif'
             with rasterio.open(output_path, 'w', **output_meta) as f:
                 f.write(img)
-                
+
+
